@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>分页笔记本</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{display:flex;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;background:#f4f4f5;color:#18181b}
+  #sidebar{width:130px;background:#fff;border-right:1px solid #e4e4e7;display:flex;flex-direction:column;padding:10px 8px;flex-shrink:0}
+  #topBtns{display:flex;gap:4px;margin-bottom:8px}
+  #topBtns button{flex:1;padding:7px 0;border:1px solid #d4d4d8;border-radius:6px;background:#fff;font-size:12px;cursor:pointer}
+  #pageList{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+  .page-item{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .page-item.active{background:#e4e4e7;font-weight:600}
+  #main{flex:1;display:flex;flex-direction:column;min-width:0}
+  #toolbar{display:flex;gap:6px;padding:10px;border-bottom:1px solid #e4e4e7;background:#fff}
+  #titleInput{flex:1;padding:8px;border:1px solid #d4d4d8;border-radius:8px;outline:0;font-size:14px;min-width:0}
+  #toolbar button{padding:8px 12px;border:1px solid #d4d4d8;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap}
+  #toolbar button.primary{background:#18181b;color:#fff;border-color:#18181b}
+  #toolbar button.danger{color:#ef4444}
+  #editor{flex:1;padding:16px;border:0;outline:0;resize:none;font:16px/1.6 inherit;background:transparent;width:100%}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <div id="topBtns">
+    <button id="newBtn">新建</button>
+    <button id="exportBtn">导出</button>
+  </div>
+  <div id="pageList"></div>
+</div>
+<div id="main">
+  <div id="toolbar">
+    <input id="titleInput" placeholder="页面标题">
+    <button id="saveBtn" class="primary">保存</button>
+    <button id="delBtn" class="danger">删除</button>
+  </div>
+  <textarea id="editor" placeholder="在这里输入内容..."></textarea>
+</div>
+<div id="toast"></div>
+<script>
+const KEY='paged_notepad_v1';
+let pages=JSON.parse(localStorage.getItem(KEY)||'[]');
+let currentId=null;
+
+function persist(){localStorage.setItem(KEY,JSON.stringify(pages))}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500)}
+
+function renderList(){
+  const list=document.getElementById('pageList');
+  list.innerHTML='';
+  pages.forEach(p=>{
+    const div=document.createElement('div');
+    div.className='page-item'+(p.id===currentId?' active':'');
+    div.textContent=p.title||'(无标题)';
+    div.onclick=()=>selectPage(p.id);
+    list.appendChild(div);
+  });
+}
+
+function selectPage(id){
+  const p=pages.find(x=>x.id===id);
+  if(!p)return;
+  currentId=id;
+  document.getElementById('titleInput').value=p.title||'';
+  document.getElementById('editor').value=p.content||'';
+  renderList();
+}
+
+function createPage(){
+  const id=Date.now().toString();
+  pages.unshift({id,title:'',content:''});
+  persist();
+  selectPage(id);
+  document.getElementById('titleInput').focus();
+}
+
+function saveCurrent(){
+  const p=pages.find(x=>x.id===currentId);
+  if(!p){createPage();return}
+  p.title=document.getElementById('titleInput').value;
+  p.content=document.getElementById('editor').value;
+  persist();
+  renderList();
+  toast('已保存');
+}
+
+function deleteCurrent(){
+  if(!currentId)return;
+  if(!confirm('确定删除这一页？'))return;
+  pages=pages.filter(p=>p.id!==currentId);
+  persist();
+  if(pages.length){selectPage(pages[0].id)}else{
+    currentId=null;
+    document.getElementById('titleInput').value='';
+    document.getElementById('editor').value='';
+    renderList();
+  }
+}
+
+function exportData(){
+  if(!pages.length){toast('没有可导出的内容');return}
+  const blob=new Blob([JSON.stringify(pages,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='notes_backup.json';
+  a.click();
+  toast('已导出');
+}
+
+document.getElementById('newBtn').onclick=createPage;
+document.getElementById('saveBtn').onclick=saveCurrent;
+document.getElementById('delBtn').onclick=deleteCurrent;
+document.getElementById('exportBtn').onclick=exportData;
+
+if(!pages.length){
+  pages.push({id:Date.now().toString(),title:'',content:''});
+  persist();
+}
+selectPage(pages[0].id);
+</script>
+</body>
+</html>
